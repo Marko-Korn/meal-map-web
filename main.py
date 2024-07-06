@@ -1,5 +1,6 @@
 import time
 import random
+import os
 import requests
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_bootstrap import Bootstrap5
@@ -17,7 +18,7 @@ articles_data = []
 favorite_recipes = []
 # Flask
 app = Flask(__name__)
-app.secret_key = "doasnd0asdn80n3n2304b"
+app.secret_key = os.environ['SECRET_KEY']
 Bootstrap5(app)
 # Initialize Flask-Login
 login_manager = LoginManager()
