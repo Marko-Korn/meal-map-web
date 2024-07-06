@@ -18,3 +18,7 @@ Currently the recipes are only in Finnish as it is the language used on the Vali
 
 - Thanks to [Valio Recipes](https://www.valio.fi) for providing the recipe data.
 - Built as part of learning Flask and web scraping techniques.
+
+## Preview
+![main](https://github.com/Marko-Korn/meal-map-web/assets/9790303/762b1bbe-a1e6-4653-bee2-9be3b21dbbfe)
+![fav](https://github.com/Marko-Korn/meal-map-web/assets/9790303/2271d4ec-7129-4e38-9ac1-1469c9af5c8b)
