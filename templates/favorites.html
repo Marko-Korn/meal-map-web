@@ -12,7 +12,7 @@
     <h1 class=" white mb-4"><b>Favorite Recipes</b></h1>
     <a href="/" class="btn btn-primary mb-3">Back to Recipes</a>
     <div class="row row-cols-1 row-cols-md-3 g-4">
-        {% for recipe in favorite_recipes %}
+        {% for recipe in current_user.favorite_recipes %}
         <div class="col">
             <div class="card h-100">
                 {% if recipe.image_url %}
@@ -22,8 +22,7 @@
                     <h5 class="card-title">{{ recipe.title }}</h5>
                     <a href="{{ recipe.link }}" class="btn btn-primary">Recipe</a>
                     <form action="/remove_from_favorites" method="POST">
-                        <input type="hidden" name="title" value="{{ recipe.title }}">
-                        <input type="hidden" name="link" value="{{ recipe.link }}">
+                        <input type="hidden" name="favorite_id" value="{{ recipe.id }}">
                         <button type="submit" class="btn btn-outline-danger mt-2">Delete</button>
                     </form>
                 </div>

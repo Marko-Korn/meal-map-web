@@ -1,7 +1,7 @@
 import time
 import random
 import requests
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from flask_bootstrap import Bootstrap5
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -9,11 +9,51 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_sqlalchemy import SQLAlchemy
 
 # Global variables
 articles_data = []
 favorite_recipes = []
+# Flask
+app = Flask(__name__)
+app.secret_key = "doasnd0asdn80n3n2304b"
+Bootstrap5(app)
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+# SQLAlchemy configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+db = SQLAlchemy(app)
 
+
+# Define User model
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    password = db.Column(db.String(60), nullable=False)
+    favorite_recipes = db.relationship('FavoriteRecipe', backref='user', lazy=True)
+
+
+# Define FavoriteRecipe model
+class FavoriteRecipe(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    link = db.Column(db.String(200), nullable=False)
+    image_url = db.Column(db.String(200), nullable=True)  # Allow NULL if images can be missing
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+def create_app():
+    # Create all tables
+    with app.app_context():
+        db.create_all()
+
+    return app
 
 # Selenium
 def fetch_articles():
@@ -64,7 +104,7 @@ def fetch_articles():
                                 articles_data.append({
                                     "title": title,
                                     "link": true_link,
-                                    "image_url": image,
+                                    "image_url": image,  # Ensure image_url is correctly assigned
                                     "time_text": time_text,
                                 })
     finally:
@@ -75,10 +115,43 @@ def fetch_articles():
 # Fetch articles once and store them
 fetch_articles()
 
-# Flask
-app = Flask(__name__)
-app.secret_key = "doasnd0asdn80n3n2304b"
-Bootstrap5(app)
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        # Check if username is already taken
+        if User.query.filter_by(username=username).first():
+            return 'Username already taken. Please choose another.'
+        # Create new user
+        new_user = User(username=username, password=password)
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user and password == user.password:
+            login_user(user)
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        else:
+            return 'Invalid username or password'
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    session.pop('logged_in', None)
+    return redirect(url_for('index'))
 
 
 @app.route("/")
@@ -87,37 +160,44 @@ def index():
     days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     return render_template("index.html", articles=random_articles, days_of_week=days_of_week)
 
+
 @app.route("/add_to_favorites", methods=["POST"])
+@login_required
 def add_to_favorites():
     title = request.form.get("title")
     link = request.form.get("link")
-    image_url = None
+    image_url = request.form.get("image_url")  # Capture image_url from the form
+    print(image_url)
 
-    # Find the corresponding article in articles_data to get image_url
-    for article in articles_data:
-        if article["title"] == title and article["link"] == link:
-            image_url = article["image_url"]
-            break
+    # Create a FavoriteRecipe instance
+    new_favorite = FavoriteRecipe(title=title, link=link, image_url=image_url, user_id=current_user.id)
 
-    favorite_recipes.append({"title": title, "link": link, "image_url": image_url})
+    # Add to database within app context
+    with app.app_context():
+        db.session.add(new_favorite)
+        db.session.commit()
+
     return redirect(url_for('index'))
 
+
 @app.route("/remove_from_favorites", methods=["POST"])
+@login_required
 def remove_from_favorites():
-    title = request.form.get("title")
-    link = request.form.get("link")
+    favorite_id = request.form.get("favorite_id")
 
-    # Remove the recipe from favorite_recipes
-    for recipe in favorite_recipes:
-        if recipe["title"] == title and recipe["link"] == link:
-            favorite_recipes.remove(recipe)
-            break
+    # Find and delete the FavoriteRecipe instance
+    favorite_recipe = FavoriteRecipe.query.get(favorite_id)
+    db.session.delete(favorite_recipe)
+    db.session.commit()
 
-    return redirect(url_for('favorites'))  # Redirect back to favorites page after removal
+    return redirect(url_for('favorites'))
+
 
 @app.route("/favorites")
 def favorites():
     return render_template("favorites.html", favorite_recipes=favorite_recipes)
 
+
 if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True)
